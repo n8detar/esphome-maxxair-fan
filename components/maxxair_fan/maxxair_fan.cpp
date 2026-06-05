@@ -7,11 +7,7 @@ namespace maxxair_fan {
 
 static const char *const TAG = "maxxair_fan";
 
-static float fahrenheit_to_celsius(uint8_t fahrenheit) { return (static_cast<float>(fahrenheit) - 32.0f) * 5.0f / 9.0f; }
-
-static uint8_t celsius_to_protocol_fahrenheit(float celsius) {
-  return static_cast<uint8_t>(clamp(static_cast<int>(lroundf(celsius * 9.0f / 5.0f + 32.0f)), 29, 99));
-}
+static float celsius_to_fahrenheit(float celsius) { return celsius * 9.0f / 5.0f + 32.0f; }
 
 void MaxxairFanComponent::setup() {
   if (this->temperature_sensor_ != nullptr) {
@@ -120,7 +116,7 @@ void MaxxairFanComponent::control_number(MaxxairNumberKind kind, float value) {
       this->smart_max_speed_ = clamp(static_cast<uint8_t>(lroundf(value)), uint8_t(1), uint8_t(10));
       break;
     case MaxxairNumberKind::AUTO_SETPOINT:
-      this->state_.auto_temperature = celsius_to_protocol_fahrenheit(value);
+      this->state_.auto_temperature = static_cast<uint8_t>(clamp(static_cast<int>(lroundf(value)), 29, 99));
       if (this->state_.auto_mode) {
         this->transmit_();
       }
@@ -236,7 +232,8 @@ void MaxxairFanComponent::apply_smart_auto_(bool transmit) {
     return;
   }
 
-  if (this->fan_off_below_low_temperature_ && this->temperature_sensor_->state < this->smart_low_temperature_) {
+  const float temperature = celsius_to_fahrenheit(this->temperature_sensor_->state);
+  if (this->fan_off_below_low_temperature_ && temperature < this->smart_low_temperature_) {
     const bool changed = this->state_.fan_on || this->state_.auto_mode || this->state_.cover_open || this->state_.special;
     this->set_fan_off_();
     if (transmit && changed) {
@@ -246,7 +243,7 @@ void MaxxairFanComponent::apply_smart_auto_(bool transmit) {
     return;
   }
 
-  const uint8_t speed = this->calculate_smart_speed_(this->temperature_sensor_->state);
+  const uint8_t speed = this->calculate_smart_speed_(temperature);
   const bool changed = !this->state_.fan_on || this->state_.fan_speed != speed * 10 || this->state_.auto_mode ||
                        !this->state_.cover_open || this->state_.special;
   this->state_.fan_on = true;
@@ -329,7 +326,7 @@ void MaxxairFanComponent::publish_numbers_() {
     this->max_speed_number_->publish_from_parent(this->smart_max_speed_);
   }
   if (this->auto_setpoint_number_ != nullptr) {
-    this->auto_setpoint_number_->publish_from_parent(fahrenheit_to_celsius(this->state_.auto_temperature));
+    this->auto_setpoint_number_->publish_from_parent(this->state_.auto_temperature);
   }
 }
 
@@ -376,6 +373,40 @@ void MaxxairFanCover::update_state(const MaxxairFanState &state) {
 
 void MaxxairFanSwitch::update_state(const MaxxairFanState &state) {
   this->publish_state(state.fan_on && state.special && !state.auto_mode && !state.cover_open);
+}
+
+void MaxxairFanNumber::setup() {
+  float value = this->initial_value_;
+  if (this->restore_value_) {
+    this->pref_ = this->make_entity_preference<float>();
+    this->pref_.load(&value);
+  }
+  this->parent_->control_number(this->kind_, value);
+}
+
+void MaxxairFanNumber::control(float value) {
+  if (this->restore_value_) {
+    this->pref_.save(&value);
+  }
+  this->parent_->control_number(this->kind_, value);
+}
+
+void MaxxairFanModeSelect::setup() {
+  size_t index = this->initial_index_;
+  if (this->restore_value_) {
+    this->pref_ = this->make_entity_preference<size_t>();
+    if (!this->pref_.load(&index) || !this->has_index(index)) {
+      index = this->initial_index_;
+    }
+  }
+  this->parent_->control_mode(index);
+}
+
+void MaxxairFanModeSelect::control(size_t index) {
+  if (this->restore_value_) {
+    this->pref_.save(&index);
+  }
+  this->parent_->control_mode(index);
 }
 
 }  // namespace maxxair_fan

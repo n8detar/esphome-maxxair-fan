@@ -47,5 +47,8 @@ maxxair_fan:
     name: Lid
   mode:
     name: Control Mode
+    restore_value: true
   auto_setpoint:
     name: Fan Thermostat Setpoint
+    initial_value: 78
+    restore_value: true

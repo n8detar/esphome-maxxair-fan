@@ -12,7 +12,10 @@ from esphome.components import (
 import esphome.config_validation as cv
 from esphome.const import (
     CONF_ID,
+    CONF_INITIAL_OPTION,
+    CONF_INITIAL_VALUE,
     CONF_NAME,
+    CONF_RESTORE_VALUE,
     DEVICE_CLASS_TEMPERATURE,
     DEVICE_CLASS_EMPTY,
     DEVICE_CLASS_WINDOW,
@@ -46,6 +49,22 @@ CONF_MODE = "mode"
 CONF_OPEN_BUTTON = "open_button"
 CONF_TEMPERATURE_SENSOR_ID = "temperature_sensor_id"
 CONF_TRANSMITTER_ID = "transmitter_id"
+
+NUMBER_RESTORE_SCHEMA = cv.Schema(
+    {
+        cv.Optional(CONF_RESTORE_VALUE, default=True): cv.boolean,
+        cv.Optional(CONF_INITIAL_VALUE): cv.float_,
+    }
+)
+
+MODE_RESTORE_SCHEMA = cv.Schema(
+    {
+        cv.Optional(CONF_RESTORE_VALUE, default=False): cv.boolean,
+        cv.Optional(CONF_INITIAL_OPTION, default="Manual"): cv.one_of(
+            "Manual", "Fan Thermostat", "Smart Thermostat"
+        ),
+    }
+)
 
 maxxair_fan_ns = cg.esphome_ns.namespace("maxxair_fan")
 MaxxairFanComponent = maxxair_fan_ns.class_("MaxxairFanComponent", cg.Component)
@@ -91,33 +110,33 @@ CONFIG_SCHEMA = cv.Schema(
         cv.Optional(CONF_LOW_TEMPERATURE): number.number_schema(
             MaxxairFanNumber,
             device_class=DEVICE_CLASS_TEMPERATURE,
-            unit_of_measurement="°C",
+            unit_of_measurement="°F",
             icon="mdi:thermometer-low",
-        ),
+        ).extend(NUMBER_RESTORE_SCHEMA),
         cv.Optional(CONF_HIGH_TEMPERATURE): number.number_schema(
             MaxxairFanNumber,
             device_class=DEVICE_CLASS_TEMPERATURE,
-            unit_of_measurement="°C",
+            unit_of_measurement="°F",
             icon="mdi:thermometer-high",
-        ),
+        ).extend(NUMBER_RESTORE_SCHEMA),
         cv.Optional(CONF_MIN_SPEED): number.number_schema(
             MaxxairFanNumber,
             icon="mdi:fan-speed-1",
-        ),
+        ).extend(NUMBER_RESTORE_SCHEMA),
         cv.Optional(CONF_MAX_SPEED): number.number_schema(
             MaxxairFanNumber,
             icon="mdi:fan-speed-3",
-        ),
+        ).extend(NUMBER_RESTORE_SCHEMA),
         cv.Optional(CONF_AUTO_SETPOINT): number.number_schema(
             MaxxairFanNumber,
             device_class=DEVICE_CLASS_TEMPERATURE,
-            unit_of_measurement="°C",
+            unit_of_measurement="°F",
             icon="mdi:thermostat",
-        ),
+        ).extend(NUMBER_RESTORE_SCHEMA),
         cv.Optional(CONF_MODE): select.select_schema(
             MaxxairFanModeSelect,
             icon="mdi:tune-variant",
-        ),
+        ).extend(MODE_RESTORE_SCHEMA),
         cv.Optional(CONF_OPEN_BUTTON): button.button_schema(
             MaxxairFanButton, icon="mdi:arrow-up-box"
         ),
@@ -158,32 +177,42 @@ async def to_code(config):
 
     if low_conf := config.get(CONF_LOW_TEMPERATURE):
         low_var = cg.new_Pvariable(low_conf[CONF_ID], var, 0)
+        cg.add(low_var.set_initial_value(low_conf.get(CONF_INITIAL_VALUE, 74)))
+        cg.add(low_var.set_restore_value(low_conf[CONF_RESTORE_VALUE]))
         await cg.register_component(low_var, low_conf)
-        await number.register_number(low_var, low_conf, min_value=-40, max_value=65, step=1)
+        await number.register_number(low_var, low_conf, min_value=-40, max_value=150, step=1)
         cg.add(var.set_low_temperature_number(low_var))
 
     if high_conf := config.get(CONF_HIGH_TEMPERATURE):
         high_var = cg.new_Pvariable(high_conf[CONF_ID], var, 1)
+        cg.add(high_var.set_initial_value(high_conf.get(CONF_INITIAL_VALUE, 80)))
+        cg.add(high_var.set_restore_value(high_conf[CONF_RESTORE_VALUE]))
         await cg.register_component(high_var, high_conf)
-        await number.register_number(high_var, high_conf, min_value=-40, max_value=65, step=1)
+        await number.register_number(high_var, high_conf, min_value=-40, max_value=150, step=1)
         cg.add(var.set_high_temperature_number(high_var))
 
     if min_speed_conf := config.get(CONF_MIN_SPEED):
         min_speed_var = cg.new_Pvariable(min_speed_conf[CONF_ID], var, 2)
+        cg.add(min_speed_var.set_initial_value(min_speed_conf.get(CONF_INITIAL_VALUE, 1)))
+        cg.add(min_speed_var.set_restore_value(min_speed_conf[CONF_RESTORE_VALUE]))
         await cg.register_component(min_speed_var, min_speed_conf)
         await number.register_number(min_speed_var, min_speed_conf, min_value=1, max_value=10, step=1)
         cg.add(var.set_min_speed_number(min_speed_var))
 
     if max_speed_conf := config.get(CONF_MAX_SPEED):
         max_speed_var = cg.new_Pvariable(max_speed_conf[CONF_ID], var, 3)
+        cg.add(max_speed_var.set_initial_value(max_speed_conf.get(CONF_INITIAL_VALUE, 10)))
+        cg.add(max_speed_var.set_restore_value(max_speed_conf[CONF_RESTORE_VALUE]))
         await cg.register_component(max_speed_var, max_speed_conf)
         await number.register_number(max_speed_var, max_speed_conf, min_value=1, max_value=10, step=1)
         cg.add(var.set_max_speed_number(max_speed_var))
 
     if auto_setpoint_conf := config.get(CONF_AUTO_SETPOINT):
         auto_setpoint_var = cg.new_Pvariable(auto_setpoint_conf[CONF_ID], var, 4)
+        cg.add(auto_setpoint_var.set_initial_value(auto_setpoint_conf.get(CONF_INITIAL_VALUE, config[CONF_AUTO_TEMPERATURE])))
+        cg.add(auto_setpoint_var.set_restore_value(auto_setpoint_conf[CONF_RESTORE_VALUE]))
         await cg.register_component(auto_setpoint_var, auto_setpoint_conf)
-        await number.register_number(auto_setpoint_var, auto_setpoint_conf, min_value=-1.7, max_value=37.2, step=0.5)
+        await number.register_number(auto_setpoint_var, auto_setpoint_conf, min_value=29, max_value=99, step=1)
         cg.add(var.set_auto_setpoint_number(auto_setpoint_var))
 
     if mode_conf := config.get(CONF_MODE):
@@ -192,6 +221,9 @@ async def to_code(config):
         options = ["Manual", "Fan Thermostat"]
         if CONF_TEMPERATURE_SENSOR_ID in config:
             options.append("Smart Thermostat")
+        initial_index = options.index(mode_conf[CONF_INITIAL_OPTION]) if mode_conf[CONF_INITIAL_OPTION] in options else 0
+        cg.add(mode_var.set_initial_index(initial_index))
+        cg.add(mode_var.set_restore_value(mode_conf[CONF_RESTORE_VALUE]))
         await select.register_select(mode_var, mode_conf, options=options)
         cg.add(var.set_mode_select(mode_var))
 

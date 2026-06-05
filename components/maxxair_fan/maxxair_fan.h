@@ -10,6 +10,7 @@
 #include "esphome/components/sensor/sensor.h"
 #include "esphome/components/switch/switch.h"
 #include "esphome/core/component.h"
+#include "esphome/core/preferences.h"
 
 #include <algorithm>
 #include <cmath>
@@ -117,8 +118,8 @@ class MaxxairFanComponent : public Component {
   MaxxairFanState state_{};
   bool smart_auto_enabled_{false};
   bool fan_off_below_low_temperature_{true};
-  float smart_low_temperature_{23.0f};
-  float smart_high_temperature_{27.0f};
+  float smart_low_temperature_{74.0f};
+  float smart_high_temperature_{80.0f};
   uint8_t smart_min_speed_{1};
   uint8_t smart_max_speed_{10};
 };
@@ -173,22 +174,34 @@ class MaxxairFanNumber : public number::Number, public Component {
  public:
   MaxxairFanNumber(MaxxairFanComponent *parent, uint8_t kind)
       : parent_(parent), kind_(static_cast<MaxxairNumberKind>(kind)) {}
+  void setup() override;
+  void set_initial_value(float initial_value) { this->initial_value_ = initial_value; }
+  void set_restore_value(bool restore_value) { this->restore_value_ = restore_value; }
   void publish_from_parent(float value) { this->publish_state(value); }
 
  protected:
-  void control(float value) override { this->parent_->control_number(this->kind_, value); }
+  void control(float value) override;
   MaxxairFanComponent *parent_;
   MaxxairNumberKind kind_;
+  float initial_value_{NAN};
+  bool restore_value_{true};
+  ESPPreferenceObject pref_;
 };
 
 class MaxxairFanModeSelect : public select::Select, public Component {
  public:
   explicit MaxxairFanModeSelect(MaxxairFanComponent *parent) : parent_(parent) {}
+  void setup() override;
+  void set_initial_index(size_t initial_index) { this->initial_index_ = initial_index; }
+  void set_restore_value(bool restore_value) { this->restore_value_ = restore_value; }
   void publish_from_parent(size_t index) { this->publish_state(index); }
 
  protected:
-  void control(size_t index) override { this->parent_->control_mode(index); }
+  void control(size_t index) override;
   MaxxairFanComponent *parent_;
+  size_t initial_index_{0};
+  bool restore_value_{false};
+  ESPPreferenceObject pref_;
 };
 
 }  // namespace maxxair_fan

@@ -88,8 +88,11 @@ maxxair_fan:
     name: Lid
   mode:
     name: Control Mode
+    restore_value: true
   auto_setpoint:
     name: Fan Thermostat Setpoint
+    initial_value: 78
+    restore_value: true
 ```
 
 See [examples/fan-thermostat.yaml](examples/fan-thermostat.yaml).
@@ -120,9 +123,13 @@ maxxair_fan:
   low_temperature:
     name: Smart Low Temperature
     device_id: maxxair_fan_device
+    initial_value: 74
+    restore_value: true
   high_temperature:
     name: Smart High Temperature
     device_id: maxxair_fan_device
+    initial_value: 80
+    restore_value: true
   min_speed:
     name: Smart Minimum Speed
     device_id: maxxair_fan_device
@@ -146,6 +153,8 @@ The optional `mode` select is the recommended way to choose between mutually exc
 
 When `temperature_sensor_id` is not configured, the mode select exposes only `Manual` and `Fan Thermostat`.
 
+The `mode` select supports `restore_value` and `initial_option`. The fan entity and ceiling fan switch use ESPHome's normal `restore_mode`; the number inputs support `restore_value` and `initial_value`.
+
 ## Smart Thermostat
 
 `Smart Thermostat` mode brings the SmartyVan blueprint idea into ESPHome. When enabled, the component reads `temperature_sensor_id`, turns the fan off below `low_temperature` when `fan_off_below_low_temperature` is `true`, and linearly maps temperatures from `low_temperature` through `high_temperature` to fan speeds from `min_speed` to `max_speed`.
@@ -156,19 +165,21 @@ With the default setting, the fan is off below the low threshold and turns on at
 
 Defaults are:
 
-- Low temperature: `23 °C` / about `74 °F`
-- High temperature: `27 °C` / about `80 °F`
+- Low temperature: `74 °F` / about `23.3 °C`
+- High temperature: `80 °F` / about `26.7 °C`
 - Minimum speed: `1`
 - Maximum speed: `10`
 - Fan off below low temperature: `true`
 
-ESPHome stores temperature sensor state in Celsius internally. The threshold and setpoint number entities report `°C`, so Home Assistant can display and convert them using your preferred unit system automatically. Smart low/high threshold numbers use whole-degree Celsius steps.
+ESPHome stores temperature sensor state in Celsius internally, but the MaxxFan remote/protocol is Fahrenheit-oriented. To avoid Home Assistant rounding oddities like `80 °F` snapping to `80.6 °F`, the smart threshold and fan setpoint number entities report `°F` with whole-degree steps. The component converts the ESPHome temperature sensor reading from Celsius to Fahrenheit internally before comparing thresholds.
 
 Selecting `Manual` disables smart thermostat control. Manual fan, lid, ceiling fan, or fan thermostat commands also return the mode to manual control.
 
 ## Built-In Auto Mode
 
-The MaxxFan IR protocol includes both an `auto_mode` bit and an `auto_temperature` byte. `Fan Thermostat` mode enables that built-in thermostat mode. The optional `auto_setpoint` number is exposed as `°C` and converted to the protocol's Fahrenheit byte when transmitted; the underlying IR field supports `29 °F` to `99 °F` (`-1.7 °C` to `37.2 °C`).
+The MaxxFan IR protocol includes both an `auto_mode` bit and an `auto_temperature` byte. `Fan Thermostat` mode enables that built-in thermostat mode. The optional `auto_setpoint` number is exposed as `°F` and maps directly to the protocol's Fahrenheit byte; valid values are `29 °F` to `99 °F`.
+
+`auto_temperature` is still supported, but you can think of it as the boot/default seed for the built-in thermostat setpoint. It is not required if you are happy with the default `78`, or if you set `auto_setpoint.initial_value`.
 
 ## Wiring
 
