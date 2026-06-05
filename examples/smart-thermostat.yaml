@@ -81,7 +81,7 @@ maxxair_fan:
     name: Smart Maximum Speed
     device_id: maxxair_fan_device
   auto_setpoint:
-    name: Built-in Auto Setpoint
+    name: Fan Thermostat Setpoint
     device_id: maxxair_fan_device
   open_button:
     name: Open Lid

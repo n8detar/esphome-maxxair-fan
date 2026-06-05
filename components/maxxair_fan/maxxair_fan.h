@@ -6,6 +6,7 @@
 #include "esphome/components/maxxfan_protocol/maxxfan_protocol.h"
 #include "esphome/components/number/number.h"
 #include "esphome/components/remote_transmitter/remote_transmitter.h"
+#include "esphome/components/select/select.h"
 #include "esphome/components/sensor/sensor.h"
 #include "esphome/components/switch/switch.h"
 #include "esphome/core/component.h"
@@ -21,11 +22,10 @@ class MaxxairFanCover;
 class MaxxairFanSwitch;
 class MaxxairFanButton;
 class MaxxairFanNumber;
+class MaxxairFanModeSelect;
 
 enum class MaxxairSwitchKind : uint8_t {
   CEILING_FAN = 0,
-  AUTO_MODE = 1,
-  SMART_AUTO = 2,
 };
 
 enum class MaxxairButtonKind : uint8_t {
@@ -62,8 +62,6 @@ class MaxxairFanComponent : public Component {
   void set_fan(MaxxairFanEntity *fan) { this->fan_ = fan; }
   void set_cover(MaxxairFanCover *cover) { this->cover_ = cover; }
   void set_ceiling_fan_switch(MaxxairFanSwitch *ceiling_fan_switch) { this->ceiling_fan_switch_ = ceiling_fan_switch; }
-  void set_auto_mode_switch(MaxxairFanSwitch *auto_mode_switch) { this->auto_mode_switch_ = auto_mode_switch; }
-  void set_smart_auto_switch(MaxxairFanSwitch *smart_auto_switch) { this->smart_auto_switch_ = smart_auto_switch; }
   void set_low_temperature_number(MaxxairFanNumber *low_temperature_number) {
     this->low_temperature_number_ = low_temperature_number;
   }
@@ -75,6 +73,7 @@ class MaxxairFanComponent : public Component {
   void set_auto_setpoint_number(MaxxairFanNumber *auto_setpoint_number) {
     this->auto_setpoint_number_ = auto_setpoint_number;
   }
+  void set_mode_select(MaxxairFanModeSelect *mode_select) { this->mode_select_ = mode_select; }
   void set_open_button(MaxxairFanButton *open_button) { this->open_button_ = open_button; }
   void set_close_button(MaxxairFanButton *close_button) { this->close_button_ = close_button; }
 
@@ -82,13 +81,14 @@ class MaxxairFanComponent : public Component {
   void control_cover(const cover::CoverCall &call);
   void control_switch(MaxxairSwitchKind kind, bool state);
   void control_number(MaxxairNumberKind kind, float value);
+  void control_mode(size_t index);
   void press_button(MaxxairButtonKind kind);
-  bool is_smart_auto_enabled() const { return this->smart_auto_enabled_; }
 
  protected:
   void transmit_();
   void publish_all_();
   void publish_numbers_();
+  void publish_mode_();
   void set_cover_open_(bool open);
   void set_fan_off_();
   void set_ceiling_fan_(bool enabled);
@@ -103,13 +103,12 @@ class MaxxairFanComponent : public Component {
   MaxxairFanEntity *fan_{nullptr};
   MaxxairFanCover *cover_{nullptr};
   MaxxairFanSwitch *ceiling_fan_switch_{nullptr};
-  MaxxairFanSwitch *auto_mode_switch_{nullptr};
-  MaxxairFanSwitch *smart_auto_switch_{nullptr};
   MaxxairFanNumber *low_temperature_number_{nullptr};
   MaxxairFanNumber *high_temperature_number_{nullptr};
   MaxxairFanNumber *min_speed_number_{nullptr};
   MaxxairFanNumber *max_speed_number_{nullptr};
   MaxxairFanNumber *auto_setpoint_number_{nullptr};
+  MaxxairFanModeSelect *mode_select_{nullptr};
   MaxxairFanButton *open_button_{nullptr};
   MaxxairFanButton *close_button_{nullptr};
   MaxxairFanState state_{};
@@ -176,6 +175,16 @@ class MaxxairFanNumber : public number::Number, public Component {
   void control(float value) override { this->parent_->control_number(this->kind_, value); }
   MaxxairFanComponent *parent_;
   MaxxairNumberKind kind_;
+};
+
+class MaxxairFanModeSelect : public select::Select, public Component {
+ public:
+  explicit MaxxairFanModeSelect(MaxxairFanComponent *parent) : parent_(parent) {}
+  void publish_from_parent(size_t index) { this->publish_state(index); }
+
+ protected:
+  void control(size_t index) override { this->parent_->control_mode(index); }
+  MaxxairFanComponent *parent_;
 };
 
 }  // namespace maxxair_fan

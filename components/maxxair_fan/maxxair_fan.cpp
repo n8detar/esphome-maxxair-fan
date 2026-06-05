@@ -24,8 +24,7 @@ void MaxxairFanComponent::dump_config() {
   }
   LOG_COVER("  ", "Cover", this->cover_);
   LOG_SWITCH("  ", "Ceiling Fan", this->ceiling_fan_switch_);
-  LOG_SWITCH("  ", "Built-in Auto Mode", this->auto_mode_switch_);
-  LOG_SWITCH("  ", "Smart Auto", this->smart_auto_switch_);
+  LOG_SELECT("  ", "Mode", this->mode_select_);
   LOG_NUMBER("  ", "Low Temperature", this->low_temperature_number_);
   LOG_NUMBER("  ", "High Temperature", this->high_temperature_number_);
   LOG_NUMBER("  ", "Minimum Speed", this->min_speed_number_);
@@ -92,19 +91,11 @@ void MaxxairFanComponent::control_cover(const cover::CoverCall &call) {
 }
 
 void MaxxairFanComponent::control_switch(MaxxairSwitchKind kind, bool state) {
-  if (kind == MaxxairSwitchKind::CEILING_FAN) {
-    this->disable_smart_auto_();
-    this->set_ceiling_fan_(state);
-  } else if (kind == MaxxairSwitchKind::AUTO_MODE) {
-    this->disable_smart_auto_();
-    this->set_auto_mode_(state);
-  } else {
-    this->set_smart_auto_(state, true);
-  }
+  (void) kind;
+  this->disable_smart_auto_();
+  this->set_ceiling_fan_(state);
 
-  if (kind != MaxxairSwitchKind::SMART_AUTO || !state) {
-    this->transmit_();
-  }
+  this->transmit_();
   this->publish_all_();
 }
 
@@ -133,6 +124,25 @@ void MaxxairFanComponent::control_number(MaxxairNumberKind kind, float value) {
   this->publish_numbers_();
   if (kind != MaxxairNumberKind::AUTO_SETPOINT) {
     this->apply_smart_auto_(true);
+  }
+  this->publish_all_();
+}
+
+void MaxxairFanComponent::control_mode(size_t index) {
+  if (index == 1) {
+    this->set_smart_auto_(false, false);
+    this->set_auto_mode_(true);
+    this->transmit_();
+  } else if (index == 2) {
+    this->set_smart_auto_(true, false);
+  } else {
+    const bool was_auto = this->state_.auto_mode;
+    this->set_smart_auto_(false, false);
+    this->state_.auto_mode = false;
+    this->state_.special = false;
+    if (was_auto) {
+      this->transmit_();
+    }
   }
   this->publish_all_();
 }
@@ -285,13 +295,8 @@ void MaxxairFanComponent::publish_all_() {
   if (this->ceiling_fan_switch_ != nullptr) {
     this->ceiling_fan_switch_->update_state(this->state_);
   }
-  if (this->auto_mode_switch_ != nullptr) {
-    this->auto_mode_switch_->update_state(this->state_);
-  }
-  if (this->smart_auto_switch_ != nullptr) {
-    this->smart_auto_switch_->update_state(this->state_);
-  }
   this->publish_numbers_();
+  this->publish_mode_();
 }
 
 void MaxxairFanComponent::publish_numbers_() {
@@ -309,6 +314,19 @@ void MaxxairFanComponent::publish_numbers_() {
   }
   if (this->auto_setpoint_number_ != nullptr) {
     this->auto_setpoint_number_->publish_from_parent(this->state_.auto_temperature);
+  }
+}
+
+void MaxxairFanComponent::publish_mode_() {
+  if (this->mode_select_ == nullptr) {
+    return;
+  }
+  if (this->smart_auto_enabled_) {
+    this->mode_select_->publish_from_parent(2);
+  } else if (this->state_.auto_mode) {
+    this->mode_select_->publish_from_parent(1);
+  } else {
+    this->mode_select_->publish_from_parent(0);
   }
 }
 
@@ -341,15 +359,7 @@ void MaxxairFanCover::update_state(const MaxxairFanState &state) {
 }
 
 void MaxxairFanSwitch::update_state(const MaxxairFanState &state) {
-  bool next_state = false;
-  if (this->kind_ == MaxxairSwitchKind::CEILING_FAN) {
-    next_state = state.fan_on && state.special && !state.auto_mode && !state.cover_open;
-  } else if (this->kind_ == MaxxairSwitchKind::AUTO_MODE) {
-    next_state = state.auto_mode;
-  } else {
-    next_state = this->parent_->is_smart_auto_enabled();
-  }
-  this->publish_state(next_state);
+  this->publish_state(state.fan_on && state.special && !state.auto_mode && !state.cover_open);
 }
 
 }  // namespace maxxair_fan
