@@ -37,6 +37,7 @@ CONF_AUTO_TEMPERATURE = "auto_temperature"
 CONF_CEILING_FAN = "ceiling_fan"
 CONF_CLOSE_BUTTON = "close_button"
 CONF_COVER = "cover"
+CONF_FAN_OFF_BELOW_LOW_TEMPERATURE = "fan_off_below_low_temperature"
 CONF_HIGH_TEMPERATURE = "high_temperature"
 CONF_LOW_TEMPERATURE = "low_temperature"
 CONF_MAX_SPEED = "max_speed"
@@ -72,6 +73,7 @@ CONFIG_SCHEMA = cv.Schema(
         ),
         cv.Optional(CONF_TEMPERATURE_SENSOR_ID): cv.use_id(sensor.Sensor),
         cv.Optional(CONF_AUTO_TEMPERATURE, default=78): cv.int_range(min=29, max=99),
+        cv.Optional(CONF_FAN_OFF_BELOW_LOW_TEMPERATURE, default=True): cv.boolean,
         cv.Optional("fan", default={}): fan.fan_schema(
             MaxxairFanEntity, icon="mdi:fan", default_restore_mode="ALWAYS_OFF"
         ),
@@ -133,6 +135,7 @@ async def to_code(config):
     transmitter = await cg.get_variable(config[CONF_TRANSMITTER_ID])
     cg.add(var.set_transmitter(transmitter))
     cg.add(var.set_auto_temperature(config[CONF_AUTO_TEMPERATURE]))
+    cg.add(var.set_fan_off_below_low_temperature(config[CONF_FAN_OFF_BELOW_LOW_TEMPERATURE]))
     if temperature_sensor_id := config.get(CONF_TEMPERATURE_SENSOR_ID):
         temperature_sensor = await cg.get_variable(temperature_sensor_id)
         cg.add(var.set_temperature_sensor(temperature_sensor))
@@ -156,13 +159,13 @@ async def to_code(config):
     if low_conf := config.get(CONF_LOW_TEMPERATURE):
         low_var = cg.new_Pvariable(low_conf[CONF_ID], var, 0)
         await cg.register_component(low_var, low_conf)
-        await number.register_number(low_var, low_conf, min_value=-40, max_value=65, step=0.1)
+        await number.register_number(low_var, low_conf, min_value=-40, max_value=65, step=1)
         cg.add(var.set_low_temperature_number(low_var))
 
     if high_conf := config.get(CONF_HIGH_TEMPERATURE):
         high_var = cg.new_Pvariable(high_conf[CONF_ID], var, 1)
         await cg.register_component(high_var, high_conf)
-        await number.register_number(high_var, high_conf, min_value=-40, max_value=65, step=0.1)
+        await number.register_number(high_var, high_conf, min_value=-40, max_value=65, step=1)
         cg.add(var.set_high_temperature_number(high_var))
 
     if min_speed_conf := config.get(CONF_MIN_SPEED):

@@ -108,10 +108,10 @@ void MaxxairFanComponent::control_switch(MaxxairSwitchKind kind, bool state) {
 void MaxxairFanComponent::control_number(MaxxairNumberKind kind, float value) {
   switch (kind) {
     case MaxxairNumberKind::LOW_TEMPERATURE:
-      this->smart_low_temperature_ = value;
+      this->smart_low_temperature_ = lroundf(value);
       break;
     case MaxxairNumberKind::HIGH_TEMPERATURE:
-      this->smart_high_temperature_ = value;
+      this->smart_high_temperature_ = lroundf(value);
       break;
     case MaxxairNumberKind::MIN_SPEED:
       this->smart_min_speed_ = clamp(static_cast<uint8_t>(lroundf(value)), uint8_t(1), uint8_t(10));
@@ -236,7 +236,7 @@ void MaxxairFanComponent::apply_smart_auto_(bool transmit) {
     return;
   }
 
-  if (this->temperature_sensor_->state <= this->smart_low_temperature_) {
+  if (this->fan_off_below_low_temperature_ && this->temperature_sensor_->state < this->smart_low_temperature_) {
     const bool changed = this->state_.fan_on || this->state_.auto_mode || this->state_.cover_open || this->state_.special;
     this->set_fan_off_();
     if (transmit && changed) {

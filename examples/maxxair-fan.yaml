@@ -55,6 +55,7 @@ maxxair_fan:
   id: roof_fan
   transmitter_id: ir_tx
   temperature_sensor_id: cabin_temperature
+  fan_off_below_low_temperature: true
   auto_temperature: 78
   fan:
     name: Fan

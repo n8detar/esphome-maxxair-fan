@@ -59,6 +59,9 @@ class MaxxairFanComponent : public Component {
   void set_transmitter(remote_transmitter::RemoteTransmitterComponent *transmitter) { this->transmitter_ = transmitter; }
   void set_temperature_sensor(sensor::Sensor *temperature_sensor) { this->temperature_sensor_ = temperature_sensor; }
   void set_auto_temperature(uint8_t auto_temperature) { this->state_.auto_temperature = auto_temperature; }
+  void set_fan_off_below_low_temperature(bool fan_off_below_low_temperature) {
+    this->fan_off_below_low_temperature_ = fan_off_below_low_temperature;
+  }
   void set_fan(MaxxairFanEntity *fan) { this->fan_ = fan; }
   void set_cover(MaxxairFanCover *cover) { this->cover_ = cover; }
   void set_ceiling_fan_switch(MaxxairFanSwitch *ceiling_fan_switch) { this->ceiling_fan_switch_ = ceiling_fan_switch; }
@@ -113,8 +116,9 @@ class MaxxairFanComponent : public Component {
   MaxxairFanButton *close_button_{nullptr};
   MaxxairFanState state_{};
   bool smart_auto_enabled_{false};
-  float smart_low_temperature_{23.9f};
-  float smart_high_temperature_{26.7f};
+  bool fan_off_below_low_temperature_{true};
+  float smart_low_temperature_{23.0f};
+  float smart_high_temperature_{27.0f};
   uint8_t smart_min_speed_{1};
   uint8_t smart_max_speed_{10};
 };

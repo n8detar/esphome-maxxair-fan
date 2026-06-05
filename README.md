@@ -103,6 +103,7 @@ maxxair_fan:
   id: roof_fan
   transmitter_id: ir_tx
   temperature_sensor_id: cabin_temperature
+  fan_off_below_low_temperature: true
   auto_temperature: 78
   fan:
     name: Fan
@@ -147,18 +148,21 @@ When `temperature_sensor_id` is not configured, the mode select exposes only `Ma
 
 ## Smart Thermostat
 
-`Smart Thermostat` mode brings the SmartyVan blueprint idea into ESPHome. When enabled, the component reads `temperature_sensor_id`, turns the fan off at or below `low_temperature`, and linearly maps temperatures above `low_temperature` through `high_temperature` to fan speeds from `min_speed` to `max_speed`.
+`Smart Thermostat` mode brings the SmartyVan blueprint idea into ESPHome. When enabled, the component reads `temperature_sensor_id`, turns the fan off below `low_temperature` when `fan_off_below_low_temperature` is `true`, and linearly maps temperatures from `low_temperature` through `high_temperature` to fan speeds from `min_speed` to `max_speed`.
 
-The original SmartyVan Home Assistant blueprint runs the fan at the configured minimum speed at or below the low threshold. This component instead keeps Smart Thermostat mode selected but turns the fan off at or below the low threshold, which behaves more like a thermostat.
+The original SmartyVan Home Assistant blueprint runs the fan at the configured minimum speed at or below the low threshold. This component defaults to keeping Smart Thermostat mode selected but turning the fan off below the low threshold, which behaves more like a thermostat. Set `fan_off_below_low_temperature: false` to use the original minimum-speed behavior.
+
+With the default setting, the fan is off below the low threshold and turns on at the minimum speed when the temperature reaches the low threshold.
 
 Defaults are:
 
-- Low temperature: `23.9 °C` / `75 °F`
-- High temperature: `26.7 °C` / `80 °F`
+- Low temperature: `23 °C` / about `74 °F`
+- High temperature: `27 °C` / about `80 °F`
 - Minimum speed: `1`
 - Maximum speed: `10`
+- Fan off below low temperature: `true`
 
-ESPHome stores temperature sensor state in Celsius internally. The threshold and setpoint number entities report `°C`, so Home Assistant can display and convert them using your preferred unit system automatically.
+ESPHome stores temperature sensor state in Celsius internally. The threshold and setpoint number entities report `°C`, so Home Assistant can display and convert them using your preferred unit system automatically. Smart low/high threshold numbers use whole-degree Celsius steps.
 
 Selecting `Manual` disables smart thermostat control. Manual fan, lid, ceiling fan, or fan thermostat commands also return the mode to manual control.
 
