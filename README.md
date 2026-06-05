@@ -120,6 +120,7 @@ maxxair_fan:
   mode:
     name: Control Mode
     device_id: maxxair_fan_device
+    restore_value: true
   low_temperature:
     name: Smart Low Temperature
     device_id: maxxair_fan_device
@@ -133,12 +134,18 @@ maxxair_fan:
   min_speed:
     name: Smart Minimum Speed
     device_id: maxxair_fan_device
+    initial_value: 1
+    restore_value: true
   max_speed:
     name: Smart Maximum Speed
     device_id: maxxair_fan_device
+    initial_value: 10
+    restore_value: true
   auto_setpoint:
     name: Fan Thermostat Setpoint
     device_id: maxxair_fan_device
+    initial_value: 78
+    restore_value: true
 ```
 
 See [examples/smart-thermostat.yaml](examples/smart-thermostat.yaml). [examples/maxxair-fan.yaml](examples/maxxair-fan.yaml) is kept as the full default example.
