@@ -7,7 +7,12 @@ namespace maxxair_fan {
 
 static const char *const TAG = "maxxair_fan";
 
-void MaxxairFanComponent::setup() { this->publish_all_(); }
+void MaxxairFanComponent::setup() {
+  if (this->temperature_sensor_ != nullptr) {
+    this->temperature_sensor_->add_on_state_callback([this](float) { this->apply_smart_auto_(true); });
+  }
+  this->publish_all_();
+}
 
 void MaxxairFanComponent::dump_config() {
   ESP_LOGCONFIG(TAG, "MaxxAir Fan:");
@@ -19,13 +24,24 @@ void MaxxairFanComponent::dump_config() {
   }
   LOG_COVER("  ", "Cover", this->cover_);
   LOG_SWITCH("  ", "Ceiling Fan", this->ceiling_fan_switch_);
-  LOG_SWITCH("  ", "Auto Mode", this->auto_mode_switch_);
+  LOG_SWITCH("  ", "Built-in Auto Mode", this->auto_mode_switch_);
+  LOG_SWITCH("  ", "Smart Auto", this->smart_auto_switch_);
+  LOG_NUMBER("  ", "Low Temperature", this->low_temperature_number_);
+  LOG_NUMBER("  ", "High Temperature", this->high_temperature_number_);
+  LOG_NUMBER("  ", "Minimum Speed", this->min_speed_number_);
+  LOG_NUMBER("  ", "Maximum Speed", this->max_speed_number_);
+  LOG_NUMBER("  ", "Built-in Auto Setpoint", this->auto_setpoint_number_);
   LOG_BUTTON("  ", "Open", this->open_button_);
   LOG_BUTTON("  ", "Close", this->close_button_);
   ESP_LOGCONFIG(TAG, "  Auto Temperature: %u F", this->state_.auto_temperature);
+  ESP_LOGCONFIG(TAG, "  Smart Low Temperature: %.1f", this->smart_low_temperature_);
+  ESP_LOGCONFIG(TAG, "  Smart High Temperature: %.1f", this->smart_high_temperature_);
+  ESP_LOGCONFIG(TAG, "  Smart Speed Range: %u-%u", this->smart_min_speed_, this->smart_max_speed_);
 }
 
 void MaxxairFanComponent::control_fan(const fan::FanCall &call) {
+  this->disable_smart_auto_();
+
   bool next_on = this->state_.fan_on;
   if (call.get_state().has_value()) {
     next_on = *call.get_state();
@@ -56,6 +72,8 @@ void MaxxairFanComponent::control_fan(const fan::FanCall &call) {
 }
 
 void MaxxairFanComponent::control_cover(const cover::CoverCall &call) {
+  this->disable_smart_auto_();
+
   if (call.get_stop()) {
     return;
   }
@@ -75,16 +93,52 @@ void MaxxairFanComponent::control_cover(const cover::CoverCall &call) {
 
 void MaxxairFanComponent::control_switch(MaxxairSwitchKind kind, bool state) {
   if (kind == MaxxairSwitchKind::CEILING_FAN) {
+    this->disable_smart_auto_();
     this->set_ceiling_fan_(state);
-  } else {
+  } else if (kind == MaxxairSwitchKind::AUTO_MODE) {
+    this->disable_smart_auto_();
     this->set_auto_mode_(state);
+  } else {
+    this->set_smart_auto_(state, true);
   }
 
-  this->transmit_();
+  if (kind != MaxxairSwitchKind::SMART_AUTO || !state) {
+    this->transmit_();
+  }
+  this->publish_all_();
+}
+
+void MaxxairFanComponent::control_number(MaxxairNumberKind kind, float value) {
+  switch (kind) {
+    case MaxxairNumberKind::LOW_TEMPERATURE:
+      this->smart_low_temperature_ = value;
+      break;
+    case MaxxairNumberKind::HIGH_TEMPERATURE:
+      this->smart_high_temperature_ = value;
+      break;
+    case MaxxairNumberKind::MIN_SPEED:
+      this->smart_min_speed_ = clamp(static_cast<uint8_t>(lroundf(value)), uint8_t(1), uint8_t(10));
+      break;
+    case MaxxairNumberKind::MAX_SPEED:
+      this->smart_max_speed_ = clamp(static_cast<uint8_t>(lroundf(value)), uint8_t(1), uint8_t(10));
+      break;
+    case MaxxairNumberKind::AUTO_SETPOINT:
+      this->state_.auto_temperature = clamp(static_cast<uint8_t>(lroundf(value)), uint8_t(29), uint8_t(99));
+      if (this->state_.auto_mode) {
+        this->transmit_();
+      }
+      break;
+  }
+
+  this->publish_numbers_();
+  if (kind != MaxxairNumberKind::AUTO_SETPOINT) {
+    this->apply_smart_auto_(true);
+  }
   this->publish_all_();
 }
 
 void MaxxairFanComponent::press_button(MaxxairButtonKind kind) {
+  this->disable_smart_auto_();
   this->set_cover_open_(kind == MaxxairButtonKind::OPEN);
   this->transmit_();
   this->publish_all_();
@@ -139,6 +193,70 @@ void MaxxairFanComponent::set_auto_mode_(bool enabled) {
   }
 }
 
+void MaxxairFanComponent::set_smart_auto_(bool enabled, bool turn_fan_off) {
+  this->smart_auto_enabled_ = enabled;
+  if (enabled) {
+    this->state_.auto_mode = false;
+    this->state_.special = false;
+    this->apply_smart_auto_(true);
+  } else if (turn_fan_off) {
+    this->set_fan_off_();
+  }
+}
+
+void MaxxairFanComponent::disable_smart_auto_() {
+  if (this->smart_auto_enabled_) {
+    this->set_smart_auto_(false, false);
+  }
+}
+
+void MaxxairFanComponent::apply_smart_auto_(bool transmit) {
+  if (!this->smart_auto_enabled_) {
+    return;
+  }
+  if (this->temperature_sensor_ == nullptr || !this->temperature_sensor_->has_state()) {
+    ESP_LOGD(TAG, "Smart auto is enabled but no temperature reading is available yet");
+    this->publish_all_();
+    return;
+  }
+
+  const uint8_t speed = this->calculate_smart_speed_(this->temperature_sensor_->state);
+  const bool changed = !this->state_.fan_on || this->state_.fan_speed != speed * 10 || this->state_.auto_mode ||
+                       !this->state_.cover_open || this->state_.special;
+  this->state_.fan_on = true;
+  this->state_.fan_speed = speed * 10;
+  this->state_.fan_exhaust = true;
+  this->state_.cover_open = true;
+  this->state_.auto_mode = false;
+  this->state_.special = false;
+
+  if (transmit && changed) {
+    this->transmit_();
+  }
+  this->publish_all_();
+}
+
+uint8_t MaxxairFanComponent::calculate_smart_speed_(float temperature) const {
+  const float low = this->smart_low_temperature_;
+  const float high = this->smart_high_temperature_;
+  const uint8_t min_speed = std::min(this->smart_min_speed_, this->smart_max_speed_);
+  const uint8_t max_speed = std::max(this->smart_min_speed_, this->smart_max_speed_);
+
+  if (high <= low) {
+    return max_speed;
+  }
+  if (temperature <= low) {
+    return min_speed;
+  }
+  if (temperature >= high) {
+    return max_speed;
+  }
+
+  const float ratio = (temperature - low) / (high - low);
+  const auto speed = static_cast<uint8_t>(lroundf(ratio * (max_speed - min_speed) + min_speed));
+  return clamp(speed, min_speed, max_speed);
+}
+
 void MaxxairFanComponent::transmit_() {
   if (this->transmitter_ == nullptr) {
     ESP_LOGW(TAG, "Cannot transmit MaxxAir command without a remote_transmitter");
@@ -169,6 +287,28 @@ void MaxxairFanComponent::publish_all_() {
   }
   if (this->auto_mode_switch_ != nullptr) {
     this->auto_mode_switch_->update_state(this->state_);
+  }
+  if (this->smart_auto_switch_ != nullptr) {
+    this->smart_auto_switch_->update_state(this->state_);
+  }
+  this->publish_numbers_();
+}
+
+void MaxxairFanComponent::publish_numbers_() {
+  if (this->low_temperature_number_ != nullptr) {
+    this->low_temperature_number_->publish_from_parent(this->smart_low_temperature_);
+  }
+  if (this->high_temperature_number_ != nullptr) {
+    this->high_temperature_number_->publish_from_parent(this->smart_high_temperature_);
+  }
+  if (this->min_speed_number_ != nullptr) {
+    this->min_speed_number_->publish_from_parent(this->smart_min_speed_);
+  }
+  if (this->max_speed_number_ != nullptr) {
+    this->max_speed_number_->publish_from_parent(this->smart_max_speed_);
+  }
+  if (this->auto_setpoint_number_ != nullptr) {
+    this->auto_setpoint_number_->publish_from_parent(this->state_.auto_temperature);
   }
 }
 
@@ -201,9 +341,14 @@ void MaxxairFanCover::update_state(const MaxxairFanState &state) {
 }
 
 void MaxxairFanSwitch::update_state(const MaxxairFanState &state) {
-  const bool next_state = this->kind_ == MaxxairSwitchKind::CEILING_FAN
-                              ? state.fan_on && state.special && !state.auto_mode && !state.cover_open
-                              : state.auto_mode;
+  bool next_state = false;
+  if (this->kind_ == MaxxairSwitchKind::CEILING_FAN) {
+    next_state = state.fan_on && state.special && !state.auto_mode && !state.cover_open;
+  } else if (this->kind_ == MaxxairSwitchKind::AUTO_MODE) {
+    next_state = state.auto_mode;
+  } else {
+    next_state = this->parent_->is_smart_auto_enabled();
+  }
   this->publish_state(next_state);
 }
 

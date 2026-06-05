@@ -16,6 +16,8 @@ The higher-level behavior follows the practical entity model from [SmartyVan/Max
 - Lid open/close cover entity.
 - Ceiling fan mode switch.
 - Auto mode switch with configurable thermostat setpoint sent in the IR packet.
+- Optional blueprint-style smart auto fan control using a temperature sensor.
+- Optional number entities for smart low/high temperature thresholds, smart min/max speed, and the built-in auto setpoint.
 - Optional open/close buttons.
 - ESPHome sub-device support through standard `device_id` on every entity.
 - Low-level `remote_transmitter.transmit_maxxfan`, `dump: maxxfan`, and `on_maxxfan` support from the protocol component.
@@ -56,9 +58,21 @@ remote_transmitter:
   carrier_duty_percent: 50%
   non_blocking: true
 
+sensor:
+  # Replace this with your actual cabin temperature sensor.
+  - platform: template
+    id: cabin_temperature
+    name: Cabin Temperature
+    device_class: temperature
+    unit_of_measurement: "°F"
+    accuracy_decimals: 1
+    lambda: return NAN;
+    update_interval: 60s
+
 maxxair_fan:
   id: roof_fan
   transmitter_id: ir_transmitter
+  temperature_sensor_id: cabin_temperature
   auto_temperature: 78
   fan:
     name: Fan
@@ -70,7 +84,25 @@ maxxair_fan:
     name: Ceiling Fan Mode
     device_id: maxxair_fan_device
   auto_mode:
-    name: Auto Mode
+    name: Built-in Auto Mode
+    device_id: maxxair_fan_device
+  smart_auto:
+    name: Smart Auto Fan
+    device_id: maxxair_fan_device
+  low_temperature:
+    name: Smart Low Temperature
+    device_id: maxxair_fan_device
+  high_temperature:
+    name: Smart High Temperature
+    device_id: maxxair_fan_device
+  min_speed:
+    name: Smart Minimum Speed
+    device_id: maxxair_fan_device
+  max_speed:
+    name: Smart Maximum Speed
+    device_id: maxxair_fan_device
+  auto_setpoint:
+    name: Built-in Auto Setpoint
     device_id: maxxair_fan_device
   open_button:
     name: Open Lid
@@ -81,6 +113,25 @@ maxxair_fan:
 ```
 
 See [examples/maxxair-fan.yaml](examples/maxxair-fan.yaml) for a complete upload-ready configuration.
+
+## Smart Auto Fan
+
+The `smart_auto` switch brings the SmartyVan blueprint behavior into ESPHome. When enabled, the component reads `temperature_sensor_id`, maps the current temperature linearly from `low_temperature` to `high_temperature`, and sets a fan speed from `min_speed` to `max_speed`.
+
+Defaults are:
+
+- Low temperature: `72`
+- High temperature: `85`
+- Minimum speed: `1`
+- Maximum speed: `10`
+
+The threshold number entities use the same unit as your ESPHome temperature sensor. If your sensor reports Celsius, set the thresholds in Celsius.
+
+Turning `smart_auto` off turns the fan off. Manual fan, lid, ceiling fan, or built-in auto-mode commands disable `smart_auto` so the fan returns to normal manual control.
+
+## Built-In Auto Mode
+
+The MaxxFan IR protocol includes both an `auto_mode` bit and an `auto_temperature` byte. The `auto_mode` switch enables or disables that built-in thermostat mode. The optional `auto_setpoint` number changes the `auto_temperature` value sent in the IR packet; valid values are `29` to `99`, matching the protocol field used by the remote.
 
 ## Wiring
 

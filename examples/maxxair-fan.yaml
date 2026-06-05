@@ -40,9 +40,21 @@ remote_transmitter:
   carrier_duty_percent: 50%
   non_blocking: true
 
+sensor:
+  # Replace this with your actual cabin temperature sensor.
+  - platform: template
+    id: cabin_temperature
+    name: Cabin Temperature
+    device_class: temperature
+    unit_of_measurement: "°F"
+    accuracy_decimals: 1
+    lambda: return NAN;
+    update_interval: 60s
+
 maxxair_fan:
   id: roof_fan
   transmitter_id: ir_transmitter
+  temperature_sensor_id: cabin_temperature
   auto_temperature: 78
   fan:
     name: Fan
@@ -54,7 +66,25 @@ maxxair_fan:
     name: Ceiling Fan Mode
     device_id: maxxair_fan_device
   auto_mode:
-    name: Auto Mode
+    name: Built-in Auto Mode
+    device_id: maxxair_fan_device
+  smart_auto:
+    name: Smart Auto Fan
+    device_id: maxxair_fan_device
+  low_temperature:
+    name: Smart Low Temperature
+    device_id: maxxair_fan_device
+  high_temperature:
+    name: Smart High Temperature
+    device_id: maxxair_fan_device
+  min_speed:
+    name: Smart Minimum Speed
+    device_id: maxxair_fan_device
+  max_speed:
+    name: Smart Maximum Speed
+    device_id: maxxair_fan_device
+  auto_setpoint:
+    name: Built-in Auto Setpoint
     device_id: maxxair_fan_device
   open_button:
     name: Open Lid
