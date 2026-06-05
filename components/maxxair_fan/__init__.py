@@ -89,13 +89,13 @@ CONFIG_SCHEMA = cv.Schema(
         cv.Optional(CONF_LOW_TEMPERATURE): number.number_schema(
             MaxxairFanNumber,
             device_class=DEVICE_CLASS_TEMPERATURE,
-            unit_of_measurement="°",
+            unit_of_measurement="°C",
             icon="mdi:thermometer-low",
         ),
         cv.Optional(CONF_HIGH_TEMPERATURE): number.number_schema(
             MaxxairFanNumber,
             device_class=DEVICE_CLASS_TEMPERATURE,
-            unit_of_measurement="°",
+            unit_of_measurement="°C",
             icon="mdi:thermometer-high",
         ),
         cv.Optional(CONF_MIN_SPEED): number.number_schema(
@@ -109,7 +109,7 @@ CONFIG_SCHEMA = cv.Schema(
         cv.Optional(CONF_AUTO_SETPOINT): number.number_schema(
             MaxxairFanNumber,
             device_class=DEVICE_CLASS_TEMPERATURE,
-            unit_of_measurement="°F",
+            unit_of_measurement="°C",
             icon="mdi:thermostat",
         ),
         cv.Optional(CONF_MODE): select.select_schema(
@@ -156,13 +156,13 @@ async def to_code(config):
     if low_conf := config.get(CONF_LOW_TEMPERATURE):
         low_var = cg.new_Pvariable(low_conf[CONF_ID], var, 0)
         await cg.register_component(low_var, low_conf)
-        await number.register_number(low_var, low_conf, min_value=-40, max_value=150, step=0.5)
+        await number.register_number(low_var, low_conf, min_value=-40, max_value=65, step=0.1)
         cg.add(var.set_low_temperature_number(low_var))
 
     if high_conf := config.get(CONF_HIGH_TEMPERATURE):
         high_var = cg.new_Pvariable(high_conf[CONF_ID], var, 1)
         await cg.register_component(high_var, high_conf)
-        await number.register_number(high_var, high_conf, min_value=-40, max_value=150, step=0.5)
+        await number.register_number(high_var, high_conf, min_value=-40, max_value=65, step=0.1)
         cg.add(var.set_high_temperature_number(high_var))
 
     if min_speed_conf := config.get(CONF_MIN_SPEED):
@@ -180,7 +180,7 @@ async def to_code(config):
     if auto_setpoint_conf := config.get(CONF_AUTO_SETPOINT):
         auto_setpoint_var = cg.new_Pvariable(auto_setpoint_conf[CONF_ID], var, 4)
         await cg.register_component(auto_setpoint_var, auto_setpoint_conf)
-        await number.register_number(auto_setpoint_var, auto_setpoint_conf, min_value=29, max_value=99, step=1)
+        await number.register_number(auto_setpoint_var, auto_setpoint_conf, min_value=-1.7, max_value=37.2, step=0.5)
         cg.add(var.set_auto_setpoint_number(auto_setpoint_var))
 
     if mode_conf := config.get(CONF_MODE):

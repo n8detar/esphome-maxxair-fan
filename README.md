@@ -53,7 +53,7 @@ wifi:
   password: !secret wifi_password
 
 remote_transmitter:
-  id: ir_transmitter
+  id: ir_tx
   pin:
     number: GPIO4
     inverted: false
@@ -62,7 +62,7 @@ remote_transmitter:
 
 maxxair_fan:
   id: roof_fan
-  transmitter_id: ir_transmitter
+  transmitter_id: ir_tx
   fan:
     name: Fan
   cover:
@@ -80,7 +80,7 @@ This exposes the fan's built-in thermostat mode. ESPHome sends the fan settings 
 ```yaml
 maxxair_fan:
   id: roof_fan
-  transmitter_id: ir_transmitter
+  transmitter_id: ir_tx
   auto_temperature: 78
   fan:
     name: Fan
@@ -101,7 +101,7 @@ This adds a temperature sensor, sub-device grouping, the mode selector, and the 
 ```yaml
 maxxair_fan:
   id: roof_fan
-  transmitter_id: ir_transmitter
+  transmitter_id: ir_tx
   temperature_sensor_id: cabin_temperature
   auto_temperature: 78
   fan:
@@ -147,22 +147,24 @@ When `temperature_sensor_id` is not configured, the mode select exposes only `Ma
 
 ## Smart Thermostat
 
-`Smart Thermostat` mode brings the SmartyVan blueprint behavior into ESPHome. When enabled, the component reads `temperature_sensor_id`, maps the current temperature linearly from `low_temperature` to `high_temperature`, and sets a fan speed from `min_speed` to `max_speed`.
+`Smart Thermostat` mode brings the SmartyVan blueprint idea into ESPHome. When enabled, the component reads `temperature_sensor_id`, turns the fan off at or below `low_temperature`, and linearly maps temperatures above `low_temperature` through `high_temperature` to fan speeds from `min_speed` to `max_speed`.
+
+The original SmartyVan Home Assistant blueprint runs the fan at the configured minimum speed at or below the low threshold. This component instead keeps Smart Thermostat mode selected but turns the fan off at or below the low threshold, which behaves more like a thermostat.
 
 Defaults are:
 
-- Low temperature: `72`
-- High temperature: `85`
+- Low temperature: `23.9 °C` / `75 °F`
+- High temperature: `26.7 °C` / `80 °F`
 - Minimum speed: `1`
 - Maximum speed: `10`
 
-The threshold number entities use the same unit as your ESPHome temperature sensor. If your sensor reports Celsius, set the thresholds in Celsius.
+ESPHome stores temperature sensor state in Celsius internally. The threshold and setpoint number entities report `°C`, so Home Assistant can display and convert them using your preferred unit system automatically.
 
 Selecting `Manual` disables smart thermostat control. Manual fan, lid, ceiling fan, or fan thermostat commands also return the mode to manual control.
 
 ## Built-In Auto Mode
 
-The MaxxFan IR protocol includes both an `auto_mode` bit and an `auto_temperature` byte. `Fan Thermostat` mode enables that built-in thermostat mode. The optional `auto_setpoint` number changes the `auto_temperature` value sent in the IR packet; valid values are `29` to `99`, matching the protocol field used by the remote.
+The MaxxFan IR protocol includes both an `auto_mode` bit and an `auto_temperature` byte. `Fan Thermostat` mode enables that built-in thermostat mode. The optional `auto_setpoint` number is exposed as `°C` and converted to the protocol's Fahrenheit byte when transmitted; the underlying IR field supports `29 °F` to `99 °F` (`-1.7 °C` to `37.2 °C`).
 
 ## Wiring
 
@@ -179,7 +181,7 @@ script:
   - id: fan_high_exhaust
     then:
       - remote_transmitter.transmit_maxxfan:
-          transmitter_id: ir_transmitter
+          transmitter_id: ir_tx
           fan_on: true
           fan_speed: 100
           fan_exhaust: true

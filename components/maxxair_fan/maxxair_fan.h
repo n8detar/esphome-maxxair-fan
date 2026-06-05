@@ -113,8 +113,8 @@ class MaxxairFanComponent : public Component {
   MaxxairFanButton *close_button_{nullptr};
   MaxxairFanState state_{};
   bool smart_auto_enabled_{false};
-  float smart_low_temperature_{72.0f};
-  float smart_high_temperature_{85.0f};
+  float smart_low_temperature_{23.9f};
+  float smart_high_temperature_{26.7f};
   uint8_t smart_min_speed_{1};
   uint8_t smart_max_speed_{10};
 };

@@ -7,6 +7,12 @@ namespace maxxair_fan {
 
 static const char *const TAG = "maxxair_fan";
 
+static float fahrenheit_to_celsius(uint8_t fahrenheit) { return (static_cast<float>(fahrenheit) - 32.0f) * 5.0f / 9.0f; }
+
+static uint8_t celsius_to_protocol_fahrenheit(float celsius) {
+  return static_cast<uint8_t>(clamp(static_cast<int>(lroundf(celsius * 9.0f / 5.0f + 32.0f)), 29, 99));
+}
+
 void MaxxairFanComponent::setup() {
   if (this->temperature_sensor_ != nullptr) {
     this->temperature_sensor_->add_on_state_callback([this](float) { this->apply_smart_auto_(true); });
@@ -114,7 +120,7 @@ void MaxxairFanComponent::control_number(MaxxairNumberKind kind, float value) {
       this->smart_max_speed_ = clamp(static_cast<uint8_t>(lroundf(value)), uint8_t(1), uint8_t(10));
       break;
     case MaxxairNumberKind::AUTO_SETPOINT:
-      this->state_.auto_temperature = clamp(static_cast<uint8_t>(lroundf(value)), uint8_t(29), uint8_t(99));
+      this->state_.auto_temperature = celsius_to_protocol_fahrenheit(value);
       if (this->state_.auto_mode) {
         this->transmit_();
       }
@@ -230,6 +236,16 @@ void MaxxairFanComponent::apply_smart_auto_(bool transmit) {
     return;
   }
 
+  if (this->temperature_sensor_->state <= this->smart_low_temperature_) {
+    const bool changed = this->state_.fan_on || this->state_.auto_mode || this->state_.cover_open || this->state_.special;
+    this->set_fan_off_();
+    if (transmit && changed) {
+      this->transmit_();
+    }
+    this->publish_all_();
+    return;
+  }
+
   const uint8_t speed = this->calculate_smart_speed_(this->temperature_sensor_->state);
   const bool changed = !this->state_.fan_on || this->state_.fan_speed != speed * 10 || this->state_.auto_mode ||
                        !this->state_.cover_open || this->state_.special;
@@ -313,7 +329,7 @@ void MaxxairFanComponent::publish_numbers_() {
     this->max_speed_number_->publish_from_parent(this->smart_max_speed_);
   }
   if (this->auto_setpoint_number_ != nullptr) {
-    this->auto_setpoint_number_->publish_from_parent(this->state_.auto_temperature);
+    this->auto_setpoint_number_->publish_from_parent(fahrenheit_to_celsius(this->state_.auto_temperature));
   }
 }
 
