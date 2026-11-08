@@ -1,0 +1,92 @@
+# CI-only build check. Never flashed. Exercises maxxair_fan with every optional
+# entity, and the maxxfan_protocol transmit action, dumper and trigger.
+esphome:
+  name: ci-maxxair-fan
+  devices:
+    - id: ci_device
+      name: CI MaxxAir Fan
+
+esp32:
+  board: esp32dev
+  framework:
+    type: esp-idf
+
+logger:
+
+external_components:
+  - source:
+      type: local
+      path: ../../components
+    components: [maxxair_fan, maxxfan_protocol]
+
+remote_transmitter:
+  id: ir_tx
+  pin: GPIO4
+  carrier_duty_percent: 50%
+  non_blocking: true
+
+remote_receiver:
+  id: ir_rx
+  pin: GPIO5
+  dump: maxxfan
+  on_maxxfan:
+    then:
+      - logger.log: maxxfan frame received
+
+sensor:
+  - platform: template
+    id: cabin_temperature
+    name: Cabin Temperature
+    unit_of_measurement: "°C"
+    lambda: return NAN;
+    update_interval: 60s
+
+script:
+  - id: raw_protocol
+    then:
+      - remote_transmitter.transmit_maxxfan:
+          transmitter_id: ir_tx
+          fan_on: true
+          fan_speed: 100
+          fan_exhaust: true
+          cover_open: true
+          auto_mode: false
+          auto_temperature: 78
+          special: false
+          warn: false
+
+maxxair_fan:
+  id: roof_fan
+  transmitter_id: ir_tx
+  temperature_sensor_id: cabin_temperature
+  fan_off_below_low_temperature: true
+  auto_temperature: 78
+  fan:
+    name: Fan
+    device_id: ci_device
+  cover:
+    name: Lid
+  ceiling_fan:
+    name: Ceiling Fan Mode
+  mode:
+    name: Control Mode
+    restore_value: true
+  low_temperature:
+    name: Smart Low Temperature
+    initial_value: 74
+  high_temperature:
+    name: Smart High Temperature
+    initial_value: 80
+  min_speed:
+    name: Smart Minimum Speed
+    initial_value: 1
+  max_speed:
+    name: Smart Maximum Speed
+    initial_value: 10
+  auto_setpoint:
+    name: Built-in Auto Setpoint
+    initial_value: 78
+  open_button:
+    name: Open Lid
+  close_button:
+    name: Close Lid
