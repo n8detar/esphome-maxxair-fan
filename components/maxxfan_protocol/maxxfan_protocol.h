@@ -25,9 +25,9 @@ struct MaxxfanData {
 
 class MaxxfanProtocol : public RemoteProtocol<MaxxfanData> {
  public:
-  void encode(RemoteTransmitData *dst, const MaxxfanData &data) override;
-  optional<MaxxfanData> decode(RemoteReceiveData src) override;
-  void dump(const MaxxfanData &data) override;
+  void encode(RemoteTransmitData *dst, const MaxxfanData &data);
+  optional<MaxxfanData> decode(RemoteReceiveData src);
+  void dump(const MaxxfanData &data);
 };
 
 DECLARE_REMOTE_PROTOCOL(Maxxfan)
